@@ -1,0 +1,23 @@
+[project]
+name = "capabarab-hd"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "csbdeep>=0.8.1",
+    "matplotlib>=3.10.3",
+    "notebook>=7.4.4",
+    "numpy>=1.26.4",
+    "openslide-bin>=4.0.0.8",
+    "openslide-python>=1.4.2",
+    "pillow>=11.3.0",
+    "shapely>=2.1.1",
+    "stardist>=0.9.1",
+    "tensorflow>=2.18.1",
+    "topact",
+    "tqdm>=4.67.1",
+]
+
+[tool.uv.sources]
+topact = { git = "https://gitlab.com/kfbenjamin/topact.git" }
