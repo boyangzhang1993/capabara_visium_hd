@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "bin2cell>=0.3.3",
     "csbdeep>=0.8.1",
     "ipywidgets>=8.1.7",
     "jupyterlab-widgets>=3.0.15",
@@ -16,6 +17,7 @@ dependencies = [
     "pillow>=11.3.0",
     "scikit-image>=0.19.3",
     "shapely>=2.1.1",
+    "spatialdata-io>=0.1.5",
     "stardist>=0.9.1",
     "tensorflow>=2.18.1",
     "topact",
