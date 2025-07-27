@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from matplotlib.patches import Rectangle, Polygon
 import bin2cell as b2c
-import Anndata
+import anndata
 # import spatialdata_io
 
 

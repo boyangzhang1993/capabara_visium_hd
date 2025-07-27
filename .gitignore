@@ -4,3 +4,5 @@
 .uv_cache/
 data
 notebooks/outputs/
+models/test_model
+notebooks/models/
