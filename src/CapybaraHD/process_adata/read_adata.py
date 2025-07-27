@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from matplotlib.patches import Rectangle, Polygon
 import bin2cell as b2c
+import Anndata
 # import spatialdata_io
 
 
@@ -388,3 +389,21 @@ def plot_probe_categorical_variable_mapped_on_adata_img(
         plt.show()
 
 
+
+def convert_adata_to_parquet(
+        adata: Anndata.adata,
+        out_f:Path|str,
+        obs_columns: list[str] = None,
+)->None:
+    expression_df = adata.to_df()
+    if obs_columns:
+        for obs_column in obs_columns:
+            if obs_column in adata.obs.columns:
+                expression_df[obs_column] = adata.obs[obs_column].values
+            else:
+                print(f"Warning: {obs_column} not found in adata.obs")
+
+    expression_df.to_parquet(out_f, index=True)
+    print(f"Data saved to {out_f} in Parquet format.")
+    
+    return expression_df

@@ -15,6 +15,7 @@ dependencies = [
     "openslide-bin>=4.0.0.8",
     "openslide-python>=1.4.2",
     "pillow>=11.3.0",
+    "scanpy>=1.11.2",
     "scikit-image>=0.19.3",
     "shapely>=2.1.1",
     "spatialdata-io>=0.1.5",

@@ -10,7 +10,8 @@ from .map_functions import transform_coordinates, reverse_transform_coordinates,
 import cv2
 from anndata import AnnData
 from skimage.color import rgb2gray
-
+import scanpy as sc
+import bin2cell as b2c
 
 class PreprocessAdataImage:
 
@@ -200,14 +201,12 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
 
     def __init__(self,
                  analyze_folder: str | Path,
-                 slide: openslide.OpenSlide,
+                 slide: openslide.OpenSlide | str | Path,
+                 tile_folder: str | Path | None = None,
                  ) -> None:
 
-        self.set_up_folders(Path(analyze_folder),
-                            slide
-
-                            )
-        self.slide = slide
+        self.set_up_folders(Path(analyze_folder), slide, tile_folder)
+        self.slide = slide if isinstance(slide, openslide.OpenSlide) else openslide.OpenSlide(slide)
 
     def one_example_tile_boundary_with_tile(self, idx=9):
         boundary_files = [f for f in self.boundary_predictions_folder.iterdir() if f.is_file() and 'tile' in f.stem]
@@ -234,10 +233,11 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
 
         return boundary_files, tile_files
 
-    def set_up_folders(self, analyze_folder, slide):
+    def set_up_folders(self, analyze_folder, slide, tile_folder:str|Path|None = None):
 
         self.boundary_predictions_folder = analyze_folder / 'nucleus_predictions'
-        self.tiles_folder = analyze_folder / f'{analyze_folder.stem}_tiles'
+        self.tiles_folder = analyze_folder / f'{str(analyze_folder.stem).split("_")[0]}_tiles' if tile_folder is None else Path(tile_folder)
+
 
         assert self.boundary_predictions_folder.exists(), f"{self.boundary_predictions_folder} does not exist"
         assert self.tiles_folder.exists(), f"{self.tiles_folder} does not exist"
@@ -301,13 +301,15 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
             plot_comprehensively=True,
             save_comprehensively: str | Path = None,
             verbose=False,
+            return_adata_subset=False,
 
     ):
         if verbose:
             print(f'File name: {boundary_f.stem}')
 
-        assert new_obs_cell_bounds_variable_name in adata.obs.columns, f"{new_obs_cell_bounds_variable_name} not in adata.obs.columns"
-
+        # assert new_obs_cell_bounds_variable_name in adata.obs.columns, f"{new_obs_cell_bounds_variable_name} not in adata.obs.columns"
+        adata.obs[new_obs_cell_bounds_variable_name] = default_cell_bounds if default_cell_bounds is not None else 'default'
+        
         boundary_x = int(boundary_f.stem.split('_')[x_index])
         boundary_y = int(boundary_f.stem.split('_')[y_index])
 
@@ -362,6 +364,27 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
             print(f'left y adata: {left_y_adata}')
             print(f'right x adata: {right_x_adata}')
             print(f'right y adata: {right_y_adata}')
+
+        if any(['spatial_x_scaled' not in adata.obs.columns, 'spatial_y_scaled' not in adata.obs.columns]):
+            img_key = [k for k in adata.uns['spatial'].keys()]
+            img_key = list(set(img_key))
+            assert len(img_key) == 1, f"img_key: {img_key}, expected only one key in adata.uns['spatial']"
+            
+            adata.obs['spatial_x'] = adata.obsm['spatial'][:, 0]
+            adata.obs['spatial_y'] = adata.obsm['spatial'][:, 1]
+            img_key = img_key[0]
+            adata.obs['spatial_x_scaled'] = adata.obs['spatial_x'] * adata.uns['spatial'][img_key]['scalefactors'][
+                'tissue_hires_scalef']
+            adata.obs['spatial_y_scaled'] = adata.obs['spatial_y'] * adata.uns['spatial'][img_key]['scalefactors'][
+                'tissue_hires_scalef']
+
+        if 'log2_adj_counts' not in adata.obs.columns:
+            sc.pp.calculate_qc_metrics(adata, inplace=True)
+            b2c.destripe(adata,
+
+                         counts_key='total_counts'
+                         )
+            adata.obs['log2_adj_counts'] = np.log2(adata.obs['n_counts_adjusted'] + 1)
 
         adata_subset = adata[
 
@@ -429,14 +452,14 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
                 point_probe = shapely.geometry.Point(adata_cells.obs.loc[adata_cell, 'spatial_x_scaled'],
                                                      adata_cells.obs.loc[adata_cell, 'spatial_y_scaled'])
                 if polygon_cell.contains(point_probe):
-                    adata.obs.loc[adata_cell, 'cell_bounds'] = polygon_cell_centroid_x_y_str
-                    adata_subset.obs.loc[adata_cell, 'cell_bounds'] = polygon_cell_centroid_x_y_str
+                    adata.obs.loc[adata_cell, new_obs_cell_bounds_variable_name] = polygon_cell_centroid_x_y_str
+                    adata_subset.obs.loc[adata_cell, new_obs_cell_bounds_variable_name] = polygon_cell_centroid_x_y_str
 
         adata_subset_plot = adata_subset[adata_subset.obs[new_obs_cell_bounds_variable_name] != default_cell_bounds, :]
-        adata_subset_plot.obs[new_obs_cell_bounds_variable_name] = adata_subset_plot.obs['cell_bounds'].astype(str)
+        adata_subset_plot.obs[new_obs_cell_bounds_variable_name] = adata_subset_plot.obs[new_obs_cell_bounds_variable_name].astype(str)
 
         # set to category variable
-        adata_subset_plot.obs['cell_bounds'] = adata_subset_plot.obs['cell_bounds'].astype('category')
+        adata_subset_plot.obs[new_obs_cell_bounds_variable_name] = adata_subset_plot.obs[new_obs_cell_bounds_variable_name].astype('category')
 
         if verbose:
             print(f'adata_subset shape: {adata_subset.shape}')
@@ -506,7 +529,7 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
             ax7.scatter(transformed_coord[:, 0], transformed_coord[:, 1], c='y', s=0.1, alpha=0.5)
         ax7.scatter(adata_subset_plot.obs['spatial_x_scaled'],
                     adata_subset_plot.obs['spatial_y_scaled'],
-                    c=adata_subset_plot.obs['cell_bounds'].cat.codes,
+                    c=adata_subset_plot.obs[new_obs_cell_bounds_variable_name].cat.codes,
                     cmap='tab20',
                     s=1)
 
@@ -551,6 +574,9 @@ class map_cell_boundary_from_ultra_high_res_histology_to_adata():
                                                            #  vmax=8,
 
                                                            )
+
+        if return_adata_subset:
+            return adata_subset
 
         return transfered_coords
 

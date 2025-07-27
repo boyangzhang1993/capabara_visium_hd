@@ -2,4 +2,5 @@
 ./notebooks/1_train_staining_model.ipynb
 ./notebooks2_train_staining_model copy.ipynb
 .uv_cache/
-data/
+data
+notebooks/outputs/
